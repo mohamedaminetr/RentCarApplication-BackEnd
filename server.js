@@ -21,13 +21,19 @@ app.get('/', (req, res) => {
 });
 
 // 🔹 Routes
+const authRoutes = require('./routes/auth.routes');
 const userRoutes = require('./routes/user.routes');
-const carRoutes = require('./routes/car.routes');
+const vehicleRoutes = require('./routes/vehicle.routes');
+const clientRoutes = require('./routes/client.routes');
+const bookingRoutes = require('./routes/booking.routes');
 
 
 // Use routes
+app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
-app.use('/cars', carRoutes);
+app.use('/vehicles', vehicleRoutes);
+app.use('/clients', clientRoutes);
+app.use('/bookings', bookingRoutes);
 
 // 🔹 404 handler
 app.use((req, res) => {
