@@ -1,4 +1,5 @@
 const pool = require("../db");
+const { recalculateUtilization } = require("./vehicle.controller");
 
 // Get all bookings
 const getAllBookings = async (req, res) => {
@@ -67,6 +68,10 @@ const createBooking = async (req, res) => {
       [numericAmount, clientName],
     );
 
+    // Recalculate vehicle utilization based on all bookings in the last 30 days
+    // Formula: utilization (%) = (rentedDaysInPeriod / 30) × 100
+    if (plate) await recalculateUtilization(plate);
+
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -121,6 +126,10 @@ const deleteBooking = async (req, res) => {
       `UPDATE clients SET rentals = GREATEST(rentals - 1, 0), "totalSpent" = GREATEST("totalSpent" - $1, 0) WHERE name = $2`,
       [numericAmount, deletedBooking.clientName],
     );
+
+    // Recalculate vehicle utilization after the booking is removed
+    // Formula: utilization (%) = (rentedDaysInPeriod / 30) × 100
+    if (deletedBooking.plate) await recalculateUtilization(deletedBooking.plate);
 
     res.json({ message: "Booking deleted successfully" });
   } catch (err) {

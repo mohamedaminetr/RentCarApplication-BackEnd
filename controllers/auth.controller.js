@@ -2,7 +2,7 @@ const pool = require("../db");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret_key";
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Login controller
 const login = async (req, res) => {
@@ -22,11 +22,9 @@ const login = async (req, res) => {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    const token = jwt.sign(
-      { id: user.id, email: user.email, role: user.role },
-      JWT_SECRET,
-      { expiresIn: "1h" }
-    );
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, {
+      expiresIn: "1h",
+    });
 
     res.json({
       message: "Login successful",
@@ -41,7 +39,7 @@ const login = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 };
 
@@ -54,7 +52,7 @@ const register = async (req, res) => {
     const result = await pool.query(
       `INSERT INTO users ("firstName", "lastName", email, password, role)
        VALUES ($1, $2, $3, $4, $5) RETURNING id, "firstName", "lastName", email, role`,
-      [firstName, lastName, email, hashedPassword, role || "admin"]
+      [firstName, lastName, email, hashedPassword, role || "admin"],
     );
 
     res.status(201).json({
@@ -66,7 +64,7 @@ const register = async (req, res) => {
     if (err.constraint === "users_email_key") {
       return res.status(400).json({ message: "Email already exists" });
     }
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", error: err.message, stack: err.stack });
   }
 };
 

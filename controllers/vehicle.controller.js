@@ -1,5 +1,54 @@
 const pool = require("../db");
 
+/**
+ * Recalculates and persists the utilization % for a given vehicle.
+ *
+ * Formula:
+ *   utilization (%) = (rentedDaysInPeriod / periodDays) × 100
+ *
+ * Where:
+ *   rentedDaysInPeriod = SUM of (returnDate - pickup) in days
+ *                        for all Confirmed or Completed bookings
+ *                        whose pickup date falls within the last 30 days
+ *   periodDays         = 30  (sliding window)
+ *
+ * Result is clamped between 0 and 100 and rounded to the nearest integer.
+ *
+ * Example:
+ *   A vehicle was booked for two trips: 5 days + 10 days = 15 days rented
+ *   utilization = (15 / 30) × 100 = 50%
+ */
+async function recalculateUtilization(plate) {
+  const PERIOD_DAYS = 30;
+
+  const result = await pool.query(
+    `SELECT COALESCE(
+       SUM(
+         GREATEST(
+           -- Clamp overlap to [0, PERIOD_DAYS] so out-of-range dates don't skew the result
+           LEAST("returnDate"::date, NOW()::date)
+           - GREATEST(pickup::date, (NOW() - INTERVAL '${PERIOD_DAYS} days')::date),
+           0
+         )
+       ), 0
+     ) AS rented_days
+     FROM bookings
+     WHERE plate = $1
+       AND status IN ('Confirmed', 'Completed')
+       AND pickup::date >= (NOW() - INTERVAL '${PERIOD_DAYS} days')::date`,
+    [plate]
+  );
+
+  const rentedDays   = parseFloat(result.rows[0].rented_days) || 0;
+  // utilization = (rentedDays / PERIOD_DAYS) * 100, clamped to [0, 100]
+  const utilization  = Math.min(100, Math.round((rentedDays / PERIOD_DAYS) * 100));
+
+  await pool.query(
+    `UPDATE vehicles SET utilization = $1 WHERE plate = $2`,
+    [utilization, plate]
+  );
+}
+
 // Get all vehicles
 const getAllVehicles = async (req, res) => {
   try {
