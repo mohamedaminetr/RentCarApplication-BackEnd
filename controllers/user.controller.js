@@ -110,43 +110,37 @@ const updateUser = async (req, res) => {
   const id = req.params.id;
   const { firstName, lastName, age, sexe, birthday, email, password, phone } = req.body;
 
-  // Create a User instance (role is not updated)
-  const updatedUser = new User({
-    id,
-    firstName,
-    lastName,
-    age,
-    sexe,
-    birthday,
-    email,
-    password,
-    phone,
-    role: undefined, // role stays unchanged
-    created_at:undefined
-  });
-
-
   try {
+    // Fetch existing user to retain password if not provided
+    const existingResult = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
+    if (existingResult.rows.length === 0) {
+      return res.status(404).json({ message: "User not found" });
+    }
+    const existingUser = existingResult.rows[0];
+
+    // Determine final password
+    let finalPassword = existingUser.password;
+    if (password && password.trim() !== '') {
+      const bcrypt = require("bcryptjs");
+      finalPassword = await bcrypt.hash(password, 10);
+    }
+
     const result = await pool.query(
       `UPDATE users
        SET "firstName"=$1, "lastName"=$2, age=$3, sexe=$4, birthday=$5, email=$6, password=$7, phone=$8
        WHERE id=$9 RETURNING *`,
       [
-        updatedUser.firstName,
-        updatedUser.lastName,
-        updatedUser.age,
-        updatedUser.sexe,
-        updatedUser.birthday,
-        updatedUser.email,
-        updatedUser.password,
-        updatedUser.phone,
-        updatedUser.id
+        firstName || existingUser.firstName,
+        lastName || existingUser.lastName,
+        age !== undefined ? age : existingUser.age,
+        sexe || existingUser.sexe,
+        birthday || existingUser.birthday,
+        email || existingUser.email,
+        finalPassword,
+        phone || existingUser.phone,
+        id
       ]
     );
-
-    if (result.rows.length === 0) {
-      return res.status(404).json({ message: "User not found" });
-    }
 
     res.status(200).json(result.rows[0]);
   } catch (err) {
