@@ -1,5 +1,17 @@
 class User {
-  constructor({ id, firstName, lastName, age, sexe, birthday, email, password, phone, role, created_at=new Date() }) {
+  constructor({
+    id,
+    firstName,
+    lastName,
+    age,
+    sexe,
+    birthday,
+    email,
+    password,
+    phone,
+    role,
+    created_at = new Date(),
+  }) {
     this.id = id;
     this.firstName = firstName;
     this.lastName = lastName;
@@ -9,7 +21,7 @@ class User {
     this.email = email;
     this.password = password;
     this.phone = phone;
-    this.role = role; // "client" or "admin"
+    this.role = role; // "client", "admin"
     this.created_at = created_at;
   }
 
@@ -35,4 +47,3 @@ class User {
 }
 
 module.exports = User;
-
