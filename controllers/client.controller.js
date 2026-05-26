@@ -1,13 +1,21 @@
-const pool = require("../db");
+const User = require("../models/user.model");
 const bcrypt = require("bcryptjs");
+
+// Helper to map User to Client response
+const mapUserToClient = (user) => {
+  const userObj = user.toObject ? user.toObject() : user;
+  return {
+    ...userObj,
+    id: userObj._id,
+    name: `${userObj.firstName} ${userObj.lastName}`.trim()
+  };
+};
 
 // Get all clients (users with role='client')
 const getAllClients = async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT *, ("firstName" || ' ' || "lastName") AS name FROM users WHERE role = 'client' ORDER BY id ASC`
-    );
-    res.json(result.rows);
+    const clients = await User.find({ role: 'client' }).sort({ created_at: 1 });
+    res.json(clients.map(mapUserToClient));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Database error" });
@@ -18,12 +26,9 @@ const getAllClients = async (req, res) => {
 const getClientById = async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await pool.query(
-      `SELECT *, ("firstName" || ' ' || "lastName") AS name FROM users WHERE id = $1 AND role = 'client'`,
-      [id]
-    );
-    if (result.rows.length === 0) return res.status(404).json({ message: "Client not found" });
-    res.json(result.rows[0]);
+    const client = await User.findOne({ _id: id, role: 'client' });
+    if (!client) return res.status(404).json({ message: "Client not found" });
+    res.json(mapUserToClient(client));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Database error" });
@@ -41,15 +46,25 @@ const createClient = async (req, res) => {
     // Default password for clients created by admin
     const defaultPassword = await bcrypt.hash('Client@2025', 10);
 
-    const result = await pool.query(
-      `INSERT INTO users ("firstName", "lastName", email, phone, password, role, rentals, "totalSpent", status, "avatarClass", initials)
-       VALUES ($1, $2, $3, $4, $5, 'client', $6, $7, $8, $9, $10) RETURNING *, ("firstName" || ' ' || "lastName") AS name`,
-      [firstName, lastName, email, phone, defaultPassword, rentals || 0, totalSpent || 0, status || "active", avatarClass || "av-teal", initials]
-    );
-    res.status(201).json(result.rows[0]);
+    const newUser = new User({
+      firstName,
+      lastName,
+      email,
+      phone,
+      password: defaultPassword,
+      role: 'client',
+      rentals: rentals || 0,
+      totalSpent: totalSpent || 0,
+      status: status || "active",
+      avatarClass: avatarClass || "av-teal",
+      initials
+    });
+
+    await newUser.save();
+    res.status(201).json(mapUserToClient(newUser));
   } catch (err) {
     console.error(err);
-    if (err.constraint === "users_email_key") {
+    if (err.code === 11000) {
       return res.status(400).json({ message: "User with this email already exists" });
     }
     res.status(500).json({ message: "Database error" });
@@ -65,14 +80,24 @@ const updateClient = async (req, res) => {
     const firstName = parts[0];
     const lastName = parts.slice(1).join(' ') || 'Unknown';
 
-    const result = await pool.query(
-      `UPDATE users 
-       SET "firstName"=$1, "lastName"=$2, email=$3, phone=$4, rentals=$5, "totalSpent"=$6, status=$7, "avatarClass"=$8, initials=$9
-       WHERE id=$10 AND role='client' RETURNING *, ("firstName" || ' ' || "lastName") AS name`,
-      [firstName, lastName, email, phone, rentals, totalSpent, status, avatarClass, initials, id]
+    const updatedUser = await User.findOneAndUpdate(
+      { _id: id, role: 'client' },
+      { 
+        firstName, 
+        lastName, 
+        email, 
+        phone, 
+        rentals, 
+        totalSpent, 
+        status, 
+        avatarClass, 
+        initials 
+      },
+      { new: true }
     );
-    if (result.rows.length === 0) return res.status(404).json({ message: "Client not found" });
-    res.json(result.rows[0]);
+
+    if (!updatedUser) return res.status(404).json({ message: "Client not found" });
+    res.json(mapUserToClient(updatedUser));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Database error" });
@@ -83,8 +108,8 @@ const updateClient = async (req, res) => {
 const deleteClient = async (req, res) => {
   const { id } = req.params;
   try {
-    const result = await pool.query("DELETE FROM users WHERE id = $1 AND role = 'client' RETURNING *", [id]);
-    if (result.rows.length === 0) return res.status(404).json({ message: "Client not found" });
+    const deletedUser = await User.findOneAndDelete({ _id: id, role: 'client' });
+    if (!deletedUser) return res.status(404).json({ message: "Client not found" });
     res.json({ message: "Client deleted successfully" });
   } catch (err) {
     console.error(err);

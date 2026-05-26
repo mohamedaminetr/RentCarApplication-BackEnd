@@ -5,6 +5,11 @@ const cors = require("cors");
 const morgan = require("morgan");
 //dotenv is used to load environment variables from a .env file into your app
 require("dotenv").config({ path: "./config/dotenv.env" });
+const connectDB = require("./db");
+
+// Connect to Database
+connectDB();
+
 // Create app
 const app = express();
 
@@ -25,6 +30,7 @@ const userRoutes = require("./routes/user.routes");
 const vehicleRoutes = require("./routes/vehicle.routes");
 const clientRoutes = require("./routes/client.routes");
 const bookingRoutes = require("./routes/booking.routes");
+const bookingService = require("./services/booking.service");
 
 // Use routes
 app.use("/auth", authRoutes);
@@ -32,6 +38,11 @@ app.use("/users", userRoutes);
 app.use("/vehicles", vehicleRoutes);
 app.use("/clients", clientRoutes);
 app.use("/bookings", bookingRoutes);
+
+// 🔹 Background tasks
+setInterval(() => {
+  bookingService.checkExpiredReservations();
+}, 60000); // Check every minute
 
 // 🔹 404 handler
 app.use((req, res) => {

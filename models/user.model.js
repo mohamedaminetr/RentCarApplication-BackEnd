@@ -1,49 +1,18 @@
-class User {
-  constructor({
-    id,
-    firstName,
-    lastName,
-    age,
-    sexe,
-    birthday,
-    email,
-    password,
-    phone,
-    role,
-    created_at = new Date(),
-  }) {
-    this.id = id;
-    this.firstName = firstName;
-    this.lastName = lastName;
-    this.age = age;
-    this.sexe = sexe;
-    this.birthday = birthday;
-    this.email = email;
-    this.password = password;
-    this.phone = phone;
-    this.role = role; // "client", "admin"
-    this.created_at = created_at;
-  }
+const mongoose = require("mongoose");
 
-  static validate(user) {
-    if (!user.firstName || !user.lastName) {
-      return "First name and last name are required";
-    }
+const userSchema = new mongoose.Schema({
+  firstName: { type: String, required: true },
+  lastName: { type: String, required: true },
+  age: { type: Number },
+  sexe: { type: String },
+  birthday: { type: Date },
+  email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+  phone: { type: String, unique: true, sparse: true },
+  role: { type: String, enum: ['client', 'admin', 'superAdmin'], default: 'admin' },
+  rentals: { type: Number, default: 0 },
+  totalSpent: { type: Number, default: 0 },
+  created_at: { type: Date, default: Date.now }
+});
 
-    if (user.age && user.age < 0) {
-      return "Age must be positive";
-    }
-
-    if (!user.email) {
-      return "Email is required";
-    }
-
-    if (!user.password) {
-      return "Password is required";
-    }
-
-    return null;
-  }
-}
-
-module.exports = User;
+module.exports = mongoose.model("User", userSchema);
